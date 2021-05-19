@@ -1,4 +1,4 @@
-# UXAV.DeviceTemplate
+# UXAV.Biamp
 
 Template project contents to be replaced.
 
@@ -33,7 +33,7 @@ Due to limitations on changing the template contents of script files, you need t
 Get-ChildItem ./.github/workflows/ -Exclude *replace_template_contents.yml | ForEach-Object {
     $relativePath = $_ | Resolve-Path -Relative
     "Replacing contents of file: $relativePath"
-    (Get-Content $_ | ForEach-Object { $_ -replace 'TemplateName', 'DeviceTemplate' }) | Set-Content $_
+    (Get-Content $_ | ForEach-Object { $_ -replace 'TemplateName', 'Biamp' }) | Set-Content $_
 }
 ```
 
