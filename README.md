@@ -1,41 +1,6 @@
-# UXAV.Biamp
+# UXAV.AVnet.Biamp
 
-Template project contents to be replaced.
-
----
-
-## TEMPLATE USAGE
-
-- Create a new project from this template.
-  This givees you a fresh repository using the latest contents of this template.
-  
-- Wait for the GitHub Action to run once on the initial commit.
-  This will run the scripts to replace the file naming and contents with your new project name.
-  
-- Remove the scripts below. Once you've created a project from this template you should remove the workflow
-  which replaces the contents of the template on first run of the GitHub Action. 
-    
-- Remove the following files:
-  `/.github/workflows/replace_template_contents.yml` & `/.github/scripts/ReplaceContents.ps1`
-  
- ### Notes on project naming
-
-Use a project name such as `MyNewProject`
-
-Using a project name such as `my-new-project` is ok but the .NET solution and related files will be formatted
-automatically as `MyNewProject`.
-
-Due to limitations on changing the template contents of script files, you need to run the following once you've pulled the project:
-
-*Note the name: TemplateName will be the old template name*
-
-```powershell
-Get-ChildItem ./.github/workflows/ -Exclude *replace_template_contents.yml | ForEach-Object {
-    $relativePath = $_ | Resolve-Path -Relative
-    "Replacing contents of file: $relativePath"
-    (Get-Content $_ | ForEach-Object { $_ -replace 'TemplateName', 'Biamp' }) | Set-Content $_
-}
-```
+Library to control Biamp DSP systems in AVnet
 
 ---
 
@@ -43,7 +8,7 @@ Get-ChildItem ./.github/workflows/ -Exclude *replace_template_contents.yml | For
 
 The project uses the following dependencies:
 
-- [UXAV.AVnetCore](https://github.com/uxav/AVnetCore)
+- [UXAV.AVnet.Core](https://www.nuget.org/packages/UXAV.AVnet.Core)
   Core library
 - [UXAV.Logging](https://github.com/uxav/UXAV.Logging)
   Logging and console application
@@ -52,7 +17,7 @@ The project uses the following dependencies:
 
 ## Project Information
 
-Insert project document info here
+Docs TBC
 
 ## Crestron Licensing
 
