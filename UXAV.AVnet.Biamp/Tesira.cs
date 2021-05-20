@@ -243,7 +243,7 @@ namespace UXAV.AVnet.Biamp
 
         protected override void OnProgramStopping()
         {
-            throw new NotImplementedException();
+            _client.Disconnect();
         }
 
         internal static string FixJsonData(string jsonData)
