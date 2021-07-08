@@ -323,13 +323,13 @@ namespace UXAV.AVnet.Biamp
                                         }
                                         else if (!_requestsSent.IsEmpty)
                                         {
-                                            Logger.Debug("Last sent request", _requestsSent.Peek());
+                                            Logger.Debug($"Last sent request: {_requestsSent.Peek()}");
 
                                             if (_requestsSent.Peek() == line)
                                             {
                                                 _requestsAwaiting.Enqueue(_requestsSent.Dequeue());
 #if DEBUG
-                                                Logger.Debug("Now awaiting for response for command", line);
+                                                Logger.Debug($"Now awaiting for response for command: {line}");
 #endif
                                             }
                                         }
@@ -359,7 +359,7 @@ namespace UXAV.AVnet.Biamp
                             }
 #if DEBUG
                             _stopWatch.Stop();
-                            Logger.Debug("Time to process: {0} ms", _stopWatch.ElapsedMilliseconds);
+                            Logger.Debug($"Time to process: {_stopWatch.ElapsedMilliseconds} ms");
                             _stopWatch.Reset();
 #endif
                             CrestronEnvironment.AllowOtherAppsToRun();
