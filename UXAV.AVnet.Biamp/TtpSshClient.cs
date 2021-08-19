@@ -1,12 +1,13 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Crestron.SimplSharp;
 using Crestron.SimplSharp.Ssh;
 using Crestron.SimplSharp.Ssh.Common;
-using Crestron.SimplSharpPro.CrestronThread;
 using UXAV.Logging;
 using Stopwatch = Crestron.SimplSharp.Stopwatch;
+using Thread = Crestron.SimplSharpPro.CrestronThread.Thread;
 
 namespace UXAV.AVnet.Biamp
 {
@@ -29,6 +30,7 @@ namespace UXAV.AVnet.Biamp
         private ShellStream _shell;
         private CTimer _keepAliveTimer;
         private decimal _timeOutCount;
+        private readonly AutoResetEvent _retryWait = new AutoResetEvent(false);
 
         private const int BufferSize = 100000;
         private const long KeepAliveTime = 30000;
@@ -119,6 +121,7 @@ namespace UXAV.AVnet.Biamp
 
         public void Disconnect()
         {
+            _retryWait.Set();
             if (_client == null || !_client.IsConnected)
             {
                 Logger.Warn("Not connected");
@@ -194,7 +197,15 @@ namespace UXAV.AVnet.Biamp
                                 GetType().Name, _address);
                             firstFail = true;
                         }
-                        Thread.Sleep(30000);
+
+                        if (_retryWait.WaitOne(TimeSpan.FromSeconds(30)))
+                        {
+                            Logger.Log("Aborting reconnection attempt");
+                            _reconnect = false;
+                            _client.Dispose();
+                            _client = null;
+                            return null;
+                        }
                     }
                 }
 
