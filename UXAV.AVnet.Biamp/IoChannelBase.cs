@@ -10,6 +10,7 @@ namespace UXAV.AVnet.Biamp
     {
         private double _level;
         private bool _mute;
+        private string _channelName;
 
         protected IoChannelBase(TesiraBlockBase controlBlock, uint channelNumber)
             : base(controlBlock, channelNumber)
@@ -43,6 +44,9 @@ namespace UXAV.AVnet.Biamp
                     case TesiraAttributeCode.Gain:
                         _level = response.TryParseResponse()["value"].Value<double>();
                         VolumeLevelString = _level.ToString("F1") + " dB";
+                        break;
+                    case TesiraAttributeCode.ChannelName:
+                        _channelName = response.TryParseResponse()["value"].Value<string>();
                         break;
                 }
             }
@@ -92,7 +96,22 @@ namespace UXAV.AVnet.Biamp
 
         public uint Id { get; }
 
-        public override string Name { get; set; } = string.Empty;
+        public override string Name
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(base.Name))
+                {
+                    return _channelName;
+                }
+
+                return base.Name;
+            }
+            set
+            {
+                base.Name = value;
+            }
+        }
 
         public virtual double Level
         {

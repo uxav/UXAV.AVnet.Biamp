@@ -334,6 +334,7 @@ namespace UXAV.AVnet.Biamp
         NumSources,
         SourceSelection,
         StereoEnable,
-        Gain
+        Gain,
+        ChannelName,
     }
 }
