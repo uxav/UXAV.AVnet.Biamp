@@ -10,7 +10,9 @@ namespace UXAV.AVnet.Biamp
 {
     public abstract class TesiraBlockBase
     {
-        private readonly Dictionary<string, TesiraAttributeCode> _subscriptions = new Dictionary<string, TesiraAttributeCode>();
+        private readonly Dictionary<string, TesiraAttributeCode> _subscriptions =
+            new Dictionary<string, TesiraAttributeCode>();
+
         private CTimer _subscribeTimer;
         private string _name;
 
@@ -68,8 +70,18 @@ namespace UXAV.AVnet.Biamp
                 Logger.Debug(GetType().Name + " \"" + InstanceTag + "\"", "Received notification \"{0}\"\r\n{1}",
                     _subscriptions[message.Id], response.TryParseResponse().ToString(Formatting.Indented));
                 ReceivedNotification(_subscriptions[message.Id], response.TryParseResponse());
+                try
+                {
+                    AttributeChanged?.Invoke(this, _subscriptions[message.Id]);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e);
+                }
             }
         }
+
+        public event EventHandler<TesiraAttributeCode> AttributeChanged;
 
         protected abstract void ReceivedResponse(TesiraResponse response);
         protected abstract void ReceivedNotification(TesiraAttributeCode attributeCode, JToken data);

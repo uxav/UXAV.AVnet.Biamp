@@ -10,19 +10,15 @@ using UXAV.AVnet.Biamp.ControlBlocks;
 using UXAV.AVnet.Core.DeviceSupport;
 using UXAV.AVnet.Core.Models.Diagnostics;
 using UXAV.Logging;
-using Assembly = System.Reflection.Assembly;
 
 namespace UXAV.AVnet.Biamp
 {
     public class Tesira : DeviceBase, IFusionAsset, IEnumerable<TesiraBlockBase>
     {
         private readonly TtpSshClient _client;
-        private string _modelName = "Tesira";
-        private string _serialNumber = "Unknown";
-        private string _versionInfo = "Unknown";
-        private readonly Dictionary<string, TesiraBlockBase> _controls = new Dictionary<string, TesiraBlockBase>(); 
 
-        public Tesira(string name, string address, string username = "default", string password = "default", uint roomIdAllocated = 0)
+        public Tesira(string name, string address, string username = "default", string password = "default",
+            uint roomIdAllocated = 0)
             : base(name, roomIdAllocated)
         {
             _client = new TtpSshClient(address, username, password);
@@ -30,23 +26,38 @@ namespace UXAV.AVnet.Biamp
             _client.ConnectionStatusChange += ClientOnConnectionStatusChange;
         }
 
-        public TesiraBlockBase this[string instanceId] => _controls[instanceId];
+        public TesiraBlockBase this[string instanceId] => Controls[instanceId];
 
         public override string ConnectionInfo => _client.DeviceAddress;
+
+        public override string VersionInfo { get; } = "Unknown";
+
+        internal Dictionary<string, TesiraBlockBase> Controls { get; } = new Dictionary<string, TesiraBlockBase>();
+
+        public IEnumerator<TesiraBlockBase> GetEnumerator()
+        {
+            return Controls.Values.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
         public override string ManufacturerName => "Biamp";
 
-        public override string ModelName => _modelName;
+        public override string ModelName { get; } = "Tesira";
 
-        public override string SerialNumber => _serialNumber;
+        public override string SerialNumber { get; } = "Unknown";
+
         public override string Identity => "";
 
-        public override string VersionInfo => _versionInfo;
-
-        internal Dictionary<string, TesiraBlockBase> Controls => _controls;
+        public FusionAssetType FusionAssetType => FusionAssetType.AudioProcessor;
 
         public event TtpSshClientReceivedDataEventHandler ReceivedData;
 
-        internal static string FormatBaseMessage(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode)
+        internal static string FormatBaseMessage(string instanceTag, TesiraCommand command,
+            TesiraAttributeCode attributeCode)
         {
             return $"{instanceTag} {command.ToString().ToLower()} {attributeCode.ToCommandString()}";
         }
@@ -73,7 +84,8 @@ namespace UXAV.AVnet.Biamp
             _client.Send(message);
         }
 
-        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes, string value)
+        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes,
+            string value)
         {
             var message = FormatBaseMessage(instanceTag, command, attributeCode);
             message = indexes.Aggregate(message, (current, index) => current + " " + index);
@@ -81,7 +93,8 @@ namespace UXAV.AVnet.Biamp
             _client.Send(message);
         }
 
-        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes, int value)
+        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes,
+            int value)
         {
             var message = FormatBaseMessage(instanceTag, command, attributeCode);
             message = indexes.Aggregate(message, (current, index) => current + " " + index);
@@ -89,7 +102,8 @@ namespace UXAV.AVnet.Biamp
             _client.Send(message);
         }
 
-        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes, double value)
+        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes,
+            double value)
         {
             var message = FormatBaseMessage(instanceTag, command, attributeCode);
             message = indexes.Aggregate(message, (current, index) => current + " " + index);
@@ -97,7 +111,8 @@ namespace UXAV.AVnet.Biamp
             _client.Send(message);
         }
 
-        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes, bool value)
+        public void Send(string instanceTag, TesiraCommand command, TesiraAttributeCode attributeCode, uint[] indexes,
+            bool value)
         {
             var message = FormatBaseMessage(instanceTag, command, attributeCode);
             message = indexes.Aggregate(message, (current, index) => current + " " + index);
@@ -178,25 +193,19 @@ namespace UXAV.AVnet.Biamp
                         {
                             json = response.TryParseResponse();
                             if (json != null)
-                            {
                                 Logger.Debug("Network Config" + "\r\n" + json.ToString(Formatting.Indented));
-                            }
                         }
                         else if (response.Command == "SESSION get aliases")
                         {
                             json = response.TryParseResponse();
                             if (json != null)
-                            {
                                 Logger.Debug("Aliases found:" + "\r\n" + json.ToString(Formatting.Indented));
-                            }
                         }
+
                         break;
                     case TesiraMessageType.Notification:
                         json = message.TryParseResponse();
-                        if (json != null)
-                        {
-                            Logger.Debug(json.ToString(Formatting.Indented));
-                        }
+                        if (json != null) Logger.Debug(json.ToString(Formatting.Indented));
                         break;
                 }
             }
@@ -222,18 +231,18 @@ namespace UXAV.AVnet.Biamp
             var nameSpace = typeof(LevelControlBlock).Namespace;
             var blockType = assembly.GetType($@"{nameSpace}.{type}");
             var ctor = blockType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new Type[] {typeof (Tesira), typeof (string)}, null);
-            return (TesiraBlockBase) ctor.Invoke(new object[] {this, instanceId});
+                new[] { typeof(Tesira), typeof(string) }, null);
+            return (TesiraBlockBase)ctor.Invoke(new object[] { this, instanceId });
         }
 
         public bool HasControlWithInstanceId(string instanceId)
         {
-            return _controls.ContainsKey(instanceId);
+            return Controls.ContainsKey(instanceId);
         }
 
         public override IEnumerable<DiagnosticMessage> GetMessages()
         {
-            return DeviceCommunicating ? new[] {this.CreateOnlineMessage()} : new[] {this.CreateOfflineMessage()};
+            return DeviceCommunicating ? new[] { this.CreateOnlineMessage() } : new[] { this.CreateOfflineMessage() };
         }
 
         public override void Initialize()
@@ -260,18 +269,6 @@ namespace UXAV.AVnet.Biamp
 #endif
             return fix;
         }
-
-        public IEnumerator<TesiraBlockBase> GetEnumerator()
-        {
-            return _controls.Values.GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public FusionAssetType FusionAssetType => FusionAssetType.AudioProcessor;
     }
 
     public static class TesiraExtensions
@@ -335,6 +332,6 @@ namespace UXAV.AVnet.Biamp
         SourceSelection,
         StereoEnable,
         Gain,
-        ChannelName,
+        ChannelName
     }
 }
