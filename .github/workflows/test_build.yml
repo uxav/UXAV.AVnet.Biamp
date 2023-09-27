@@ -53,15 +53,18 @@ jobs:
       - name: Setup NuGet.exe
         uses: NuGet/setup-nuget@v1.0.5
 
+      - name: Add Nuget API Key for nuget.org
+        run: nuget setapikey ${{ secrets.NUGET_UXAV_API_KEY }}
+
       - name: Nuget Add Source
-        run: nuget sources Add -Name "uxav" -Source https://nuget.pkg.github.com/uxav/index.json -username uxav -password ${{ secrets.UXAV_PACKAGE_TOKEN }} -StorePasswordInClearText
+        run: nuget sources Add -Name "uxav" -Source https://nuget.pkg.github.com/uxav/index.json -username uxav -password ${{ secrets.GITHUB_TOKEN }} -StorePasswordInClearText
 
       - name: Restore Nuget Packages
-        run: nuget restore UXAV.DeviceTemplate.sln
+        run: nuget restore UXAV.AVnet.Biamp.sln
 
       - name: Build
-        run: msbuild UXAV.DeviceTemplate.sln /p:Configuration=Release
+        run: msbuild UXAV.AVnet.Biamp.sln /p:Configuration=Release
 
       - name: Pack Nuget
-        run: nuget pack UXAV.DeviceTemplate/UXAV.DeviceTemplate.csproj
+        run: nuget pack UXAV.AVnet.Biamp/UXAV.AVnet.Biamp.csproj
           

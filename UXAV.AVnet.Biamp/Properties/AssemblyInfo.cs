@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("UXAV.Biamp")]
-[assembly: AssemblyDescription("Device control for a device")]
+[assembly: AssemblyTitle("UXAV.AVnet.Biamp")]
+[assembly: AssemblyDescription("AVnet control for Biamp DSP systems")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("UXAV")]
-[assembly: AssemblyProduct("UXAV.Biamp")]
-[assembly: AssemblyCopyright("Copyright © UXAV 2020")]
+[assembly: AssemblyProduct("UXAV.AVnet.Biamp")]
+[assembly: AssemblyCopyright("Copyright © UXAV 2021")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
 // to COM components.  If you need to access a type in this assembly from 
