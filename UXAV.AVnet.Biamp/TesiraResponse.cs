@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UXAV.Logging;
 
@@ -33,44 +34,57 @@ namespace UXAV.AVnet.Biamp
 
                 try
                 {
-                    var matches = Regex.Matches(_command, @"\w+");
+                    var matches = Regex.Matches(_command, @"\w+|([""'])(?:(?=(\\?))\2.)*?\1");
+                    var words = (from Match match in matches
+                        select match.Groups[1].Value == "\""
+                            ? match.Value.Substring(1, match.Value.Length - 2)
+                            : match.Value).ToList();
 
-                    if (matches.Count > 0)
+                    if (words.Count > 0)
                     {
-                        _instanceId = matches[0].Value;
+                        _instanceId = words[0];
                     }
 
-                    if (matches.Count > 1)
+                    if (words.Count > 1)
                     {
                         try
                         {
-                            CommandType = (TesiraCommand) Enum.Parse(typeof (TesiraCommand), matches[1].Value, true);
+                            CommandType = (TesiraCommand) Enum.Parse(typeof (TesiraCommand), words[1], true);
                         }
                         catch (ArgumentException e)
                         {
-                            Logger.Error("Could not parse TesiraCommand from \"{0}\"", matches[1].Value);
+                            Logger.Error("Could not parse TesiraCommand from \"{0}\"", words[1]);
                             throw e;
                         }
                     }
 
-                    if (matches.Count > 2)
+                    if (words.Count > 2 && CommandType != TesiraCommand.RecallPresetByName)
                     {
                         try
                         {
-                            AttributeCode = (TesiraAttributeCode)Enum.Parse(typeof(TesiraAttributeCode), matches[2].Value, true);
+                            AttributeCode = (TesiraAttributeCode)Enum.Parse(typeof(TesiraAttributeCode), words[2], true);
                         }
                         catch (ArgumentException e)
                         {
-                            Logger.Error("Could not parse TesiraAttributeCode from \"{0}\"", matches[2].Value);
+                            Logger.Error("Could not parse TesiraAttributeCode from \"{0}\"", words[2]);
                             throw e;
                         }
+
+                        if (words.Count <= 3) return;
+
+                        for (var i = 3; i < words.Count; i++)
+                        {
+                            _otherCommandElements.Add(words[i]);
+                        }
                     }
-
-                    if (matches.Count <= 3) return;
-
-                    for (var i = 3; i < matches.Count; i++)
+                    else if (CommandType == TesiraCommand.RecallPresetByName)
                     {
-                        _otherCommandElements.Add(matches[i].Value);
+                        if (words.Count <= 2) return;
+
+                        for (var i = 2; i < words.Count; i++)
+                        {
+                            _otherCommandElements.Add(words[i]);
+                        }
                     }
                 }
                 catch (Exception e)
