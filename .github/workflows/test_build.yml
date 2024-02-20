@@ -16,7 +16,7 @@ jobs:
     runs-on: windows-latest
     if: github.run_number > 1
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
@@ -24,7 +24,7 @@ jobs:
       - name: Get Version Number
         shell: powershell
         run: |
-          $version = ./.github/scripts/GetVersionFromAssemblyInfo.ps1 -Path UXAV.DeviceTemplate/Properties/AssemblyInfo.cs
+          $version = ./.github/scripts/GetVersionFromAssemblyInfo.ps1 -Path UXAV.AVnet.Biamp/Properties/AssemblyInfo.cs
           Write-Output "Version is: $version"
           $versionTitle = ./.github/scripts/CreateVersionTitle.ps1 -Version $version
           Write-Output "Version title is: $version"
@@ -45,13 +45,13 @@ jobs:
 
       - name: Update AssemblyInfo.cs
         shell: powershell
-        run: ./.github/scripts/UpdateAssemblyVersion.ps1 -Path UXAV.DeviceTemplate/Properties/AssemblyInfo.cs -Version ${{ env.VERSION }}
+        run: ./.github/scripts/UpdateAssemblyVersion.ps1 -Path UXAV.AVnet.Biamp/Properties/AssemblyInfo.cs -Version ${{ env.VERSION }}
         
       - name: Setup MsBuild
-        uses: microsoft/setup-msbuild@v1
+        uses: microsoft/setup-msbuild@v2
         
       - name: Setup NuGet.exe
-        uses: NuGet/setup-nuget@v1.0.5
+        uses: NuGet/setup-nuget@v2
 
       - name: Add Nuget API Key for nuget.org
         run: nuget setapikey ${{ secrets.NUGET_UXAV_API_KEY }}

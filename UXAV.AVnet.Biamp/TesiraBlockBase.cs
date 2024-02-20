@@ -60,15 +60,19 @@ namespace UXAV.AVnet.Biamp
             if (message.Type != TesiraMessageType.Notification && message.Id == InstanceTag)
             {
                 if (!(message is TesiraResponse response) || response.Type != TesiraMessageType.OkWithResponse) return;
+#if DEBUG
                 Logger.Debug(GetType().Name + " \"" + InstanceTag + "\"", "Received {0}\r\n{1}",
                     response.AttributeCode, response.TryParseResponse().ToString(Formatting.Indented));
+#endif
                 ReceivedResponse(response);
             }
             else if (message.Type == TesiraMessageType.Notification && _subscriptions.ContainsKey(message.Id))
             {
                 if (!(message is TesiraNotification response)) return;
+#if DEBUG
                 Logger.Debug(GetType().Name + " \"" + InstanceTag + "\"", "Received notification \"{0}\"\r\n{1}",
                     _subscriptions[message.Id], response.TryParseResponse().ToString(Formatting.Indented));
+#endif
                 ReceivedNotification(_subscriptions[message.Id], response.TryParseResponse());
                 try
                 {

@@ -201,11 +201,10 @@ namespace UXAV.AVnet.Biamp
                             if (json != null)
                                 Logger.Debug("Aliases found:" + "\r\n" + json.ToString(Formatting.Indented));
                         }
-
                         break;
                     case TesiraMessageType.Notification:
-                        json = message.TryParseResponse();
-                        if (json != null) Logger.Debug(json.ToString(Formatting.Indented));
+                        // json = message.TryParseResponse();
+                        // if (json != null) Logger.Debug(json.ToString(Formatting.Indented));
                         break;
                 }
             }

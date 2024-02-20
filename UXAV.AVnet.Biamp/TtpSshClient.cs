@@ -334,7 +334,9 @@ namespace UXAV.AVnet.Biamp
                                         }
                                         else if (!_requestsSent.IsEmpty)
                                         {
+#if DEBUG
                                             Logger.Debug($"Last sent request: {_requestsSent.Peek()}");
+#endif
 
                                             if (_requestsSent.Peek() == line)
                                             {
