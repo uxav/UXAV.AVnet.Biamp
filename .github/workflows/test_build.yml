@@ -16,7 +16,7 @@ jobs:
     runs-on: windows-latest
     if: github.run_number > 1
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
@@ -48,10 +48,10 @@ jobs:
         run: ./.github/scripts/UpdateAssemblyVersion.ps1 -Path UXAV.DeviceTemplate/Properties/AssemblyInfo.cs -Version ${{ env.VERSION }}
         
       - name: Setup MsBuild
-        uses: microsoft/setup-msbuild@v1
+        uses: microsoft/setup-msbuild@v2
         
       - name: Setup NuGet.exe
-        uses: NuGet/setup-nuget@v1.0.5
+        uses: NuGet/setup-nuget@v2
 
       - name: Add Nuget API Key for nuget.org
         run: nuget setapikey ${{ secrets.NUGET_UXAV_API_KEY }}
