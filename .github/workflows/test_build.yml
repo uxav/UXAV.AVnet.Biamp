@@ -24,7 +24,7 @@ jobs:
       - name: Get Version Number
         shell: powershell
         run: |
-          $version = ./.github/scripts/GetVersionFromAssemblyInfo.ps1 -Path UXAV.DeviceTemplate/Properties/AssemblyInfo.cs
+          $version = ./.github/scripts/GetVersionFromAssemblyInfo.ps1 -Path UXAV.AVnet.Biamp/Properties/AssemblyInfo.cs
           Write-Output "Version is: $version"
           $versionTitle = ./.github/scripts/CreateVersionTitle.ps1 -Version $version
           Write-Output "Version title is: $version"
@@ -45,7 +45,7 @@ jobs:
 
       - name: Update AssemblyInfo.cs
         shell: powershell
-        run: ./.github/scripts/UpdateAssemblyVersion.ps1 -Path UXAV.DeviceTemplate/Properties/AssemblyInfo.cs -Version ${{ env.VERSION }}
+        run: ./.github/scripts/UpdateAssemblyVersion.ps1 -Path UXAV.AVnet.Biamp/Properties/AssemblyInfo.cs -Version ${{ env.VERSION }}
         
       - name: Setup MsBuild
         uses: microsoft/setup-msbuild@v2
