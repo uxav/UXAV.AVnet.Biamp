@@ -6,6 +6,7 @@ using UXAV.Logging;
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.LogicStateBlock)]
     public class LogicStateBlock : TesiraBlockBase
     {
         private readonly Dictionary<uint, LogicStateChannel> _channels = new Dictionary<uint, LogicStateChannel>();
@@ -63,12 +64,12 @@ namespace UXAV.AVnet.Biamp.ControlBlocks
 
         protected override void ReceivedNotification(TesiraAttributeCode attributeCode, JToken data)
         {
-            
+
         }
 
         public override void Subscribe()
         {
-            
+
         }
     }
 }

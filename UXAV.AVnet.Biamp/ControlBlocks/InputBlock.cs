@@ -2,6 +2,7 @@
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.InputBlock)]
     public class InputBlock : MultiChannelBlockBase<InputChannel>
     {
         internal InputBlock(Tesira device, string instanceTag)

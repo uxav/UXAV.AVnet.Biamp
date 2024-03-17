@@ -8,6 +8,7 @@ using UXAV.Logging;
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.DialerBlock)]
     public class DialerBlock : TesiraBlockBase, IEnumerable<DialerLine>
     {
         private readonly Dictionary<uint, DialerLine> _channels = new Dictionary<uint, DialerLine>();
@@ -101,26 +102,26 @@ namespace UXAV.AVnet.Biamp.ControlBlocks
             switch (attributeCode)
             {
                 case TesiraAttributeCode.CallState:
-                {
-                    var callStates = data["value"]["callState"].ToObject<List<CallState>>();
-                    foreach (var line in _channels)
                     {
-                        var statesForLine = callStates.Where(c => c.LineId == (line.Key - 1));
-                        line.Value.UpdateCallStates(statesForLine);
+                        var callStates = data["value"]["callState"].ToObject<List<CallState>>();
+                        foreach (var line in _channels)
+                        {
+                            var statesForLine = callStates.Where(c => c.LineId == (line.Key - 1));
+                            line.Value.UpdateCallStates(statesForLine);
+                        }
                     }
-                }
                     break;
                 case TesiraAttributeCode.DisplayNameLabel:
-                {
-                    
-                }
+                    {
+
+                    }
                     break;
             }
         }
 
         public void ForceCallStateUpdate()
         {
-            Device.Send(InstanceTag, TesiraCommand.Get, TesiraAttributeCode.CallState);            
+            Device.Send(InstanceTag, TesiraCommand.Get, TesiraAttributeCode.CallState);
         }
 
         public override void Subscribe()
