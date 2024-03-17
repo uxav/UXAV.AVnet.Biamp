@@ -30,15 +30,15 @@ namespace UXAV.AVnet.Biamp
             {
                 _command = value;
 
-                if(this is TesiraErrorResponse) return;
+                if (this is TesiraErrorResponse) return;
 
                 try
                 {
                     var matches = Regex.Matches(_command, @"\w+|([""'])(?:(?=(\\?))\2.)*?\1");
                     var words = (from Match match in matches
-                        select match.Groups[1].Value == "\""
-                            ? match.Value.Substring(1, match.Value.Length - 2)
-                            : match.Value).ToList();
+                                 select match.Groups[1].Value == "\""
+                                     ? match.Value.Substring(1, match.Value.Length - 2)
+                                     : match.Value).ToList();
 
                     if (words.Count > 0)
                     {
@@ -49,12 +49,12 @@ namespace UXAV.AVnet.Biamp
                     {
                         try
                         {
-                            CommandType = (TesiraCommand) Enum.Parse(typeof (TesiraCommand), words[1], true);
+                            CommandType = (TesiraCommand)Enum.Parse(typeof(TesiraCommand), words[1], true);
                         }
                         catch (ArgumentException e)
                         {
                             Logger.Error("Could not parse TesiraCommand from \"{0}\"", words[1]);
-                            throw e;
+                            throw new AggregateException(e);
                         }
                     }
 
@@ -67,7 +67,7 @@ namespace UXAV.AVnet.Biamp
                         catch (ArgumentException e)
                         {
                             Logger.Error("Could not parse TesiraAttributeCode from \"{0}\"", words[2]);
-                            throw e;
+                            throw new AggregateException(e);
                         }
 
                         if (words.Count <= 3) return;
