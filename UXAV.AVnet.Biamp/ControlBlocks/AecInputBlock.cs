@@ -2,6 +2,7 @@
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.AecInputBlock)]
     public class AecInputBlock : MultiChannelBlockBase<AecInputChannel>
     {
         internal AecInputBlock(Tesira device, string instanceTag)

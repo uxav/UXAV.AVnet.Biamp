@@ -5,6 +5,7 @@ using UXAV.Logging;
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.SourceSelectorBlock)]
     public sealed class SourceSelectorBlock : TesiraBlockBase
     {
         private uint _numberOfInputs;
@@ -34,7 +35,7 @@ namespace UXAV.AVnet.Biamp.ControlBlocks
         public uint SourceSelection
         {
             get => _sourceSelection;
-            set { Device.Send(InstanceTag, TesiraCommand.Set, TesiraAttributeCode.SourceSelection, new[] {value}); }
+            set { Device.Send(InstanceTag, TesiraCommand.Set, TesiraAttributeCode.SourceSelection, new[] { value }); }
         }
 
         protected override void ControlShouldInitialize()

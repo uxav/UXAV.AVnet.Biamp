@@ -1,8 +1,9 @@
- 
+
 using Newtonsoft.Json.Linq;
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.LevelControlBlock)]
     public sealed class LevelControlBlock : MultiChannelBlockBase<LevelChannel>
     {
         internal LevelControlBlock(Tesira device, string instanceId) : base(device, instanceId)

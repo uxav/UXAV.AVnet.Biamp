@@ -2,6 +2,7 @@ using Newtonsoft.Json.Linq;
 
 namespace UXAV.AVnet.Biamp.ControlBlocks
 {
+    [ControlBlockType(TesiraBlockType.MuteControlBlock)]
     public sealed class MuteControlBlock : MultiChannelBlockBase<MuteChannel>
     {
         internal MuteControlBlock(Tesira device, string instanceId)

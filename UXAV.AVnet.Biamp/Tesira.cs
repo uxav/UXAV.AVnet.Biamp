@@ -234,6 +234,24 @@ namespace UXAV.AVnet.Biamp
             return (TesiraBlockBase)ctor.Invoke(new object[] { this, instanceId });
         }
 
+        internal static IEnumerable<Type> GetTypesWithControlBlockTypeAttribute(TesiraBlockType type)
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var nameSpace = typeof(LevelControlBlock).Namespace;
+            return assembly.GetTypes().Where(t => t.GetCustomAttributes<ControlBlockTypeAttribute>()
+                .Any(a => a.Type == type));
+        }
+
+        public T RegisterControlBlock<T>(string instanceId) where T : TesiraBlockBase
+        {
+            var type = Enum.Parse(typeof(TesiraBlockType), typeof(T).Name);
+            var blockType = GetTypesWithControlBlockTypeAttribute((TesiraBlockType)type).FirstOrDefault()
+                ?? throw new ArgumentException("No control block type found for " + type);
+            var ctor = blockType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null,
+                [typeof(Tesira), typeof(string)], null);
+            return (T)ctor.Invoke([this, instanceId]);
+        }
+
         public bool HasControlWithInstanceId(string instanceId)
         {
             return Controls.ContainsKey(instanceId);
