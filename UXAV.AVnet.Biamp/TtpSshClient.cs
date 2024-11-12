@@ -188,13 +188,12 @@ namespace UXAV.AVnet.Biamp
                         ConnectionStatus = ClientStatus.AttemptingConnection;
                         _client.Connect();
                     }
-                    catch
+                    catch (Exception e)
                     {
                         ConnectionStatus = ClientStatus.Disconnected;
                         if (!firstFail)
                         {
-                            Logger.Warn("{0} could not connect to {1}, will retry every 30 seconds until connected",
-                                GetType().Name, _address);
+                            Logger.Error(e);
                             firstFail = true;
                         }
 
@@ -272,7 +271,7 @@ namespace UXAV.AVnet.Biamp
                                     }
                                     else
                                     {
-                                        if(dataCount == 0) continue;
+                                        if (dataCount == 0) continue;
 
                                         var line = Encoding.UTF8.GetString(buffer, 0, dataCount);
                                         dataCount = 0;
@@ -327,10 +326,10 @@ namespace UXAV.AVnet.Biamp
                                         else if (line.StartsWith("! "))
                                         {
 #if DEBUG
-                                                Logger.Debug("Notification Received");
-                                                Logger.Debug(line);
+                                            Logger.Debug("Notification Received");
+                                            Logger.Debug(line);
 #endif
-                                                message = new TesiraNotification(line.Substring(2));
+                                            message = new TesiraNotification(line.Substring(2));
                                         }
                                         else if (!_requestsSent.IsEmpty)
                                         {
@@ -402,9 +401,9 @@ namespace UXAV.AVnet.Biamp
                             _requestsSent.Enqueue(s);
                             Thread.Sleep(20);
                         }
-                        else if(!_requestsSent.IsEmpty || !_requestsAwaiting.IsEmpty)
+                        else if (!_requestsSent.IsEmpty || !_requestsAwaiting.IsEmpty)
                         {
-                            _timeOutCount ++;
+                            _timeOutCount++;
 
                             if (_timeOutCount > 100)
                             {
