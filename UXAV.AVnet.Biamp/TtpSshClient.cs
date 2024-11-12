@@ -1,37 +1,29 @@
 using System;
-using System.Linq;
-using System.Text;
+using System.Collections.Concurrent;
+using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Crestron.SimplSharp;
-using Crestron.SimplSharp.Ssh;
-using Crestron.SimplSharp.Ssh.Common;
+using Renci.SshNet;
 using UXAV.Logging;
-using Stopwatch = Crestron.SimplSharp.Stopwatch;
-using Thread = Crestron.SimplSharpPro.CrestronThread.Thread;
 
 namespace UXAV.AVnet.Biamp
 {
     public class TtpSshClient
     {
         private SshClient _client;
-        private Thread _sshProcess;
         private bool _reconnect;
-        private readonly CrestronQueue<string> _sendQueue = new CrestronQueue<string>(500);
-        private readonly CrestronQueue<string> _requestsSent = new CrestronQueue<string>(500);
-        private readonly CrestronQueue<string> _requestsAwaiting = new CrestronQueue<string>(500);
+        private readonly ConcurrentQueue<string> _sendQueue = new ConcurrentQueue<string>();
+        private readonly ConcurrentQueue<string> _requestsSent = new ConcurrentQueue<string>();
+        private readonly ConcurrentQueue<string> _requestsAwaiting = new ConcurrentQueue<string>();
         private readonly string _address;
         private readonly string _username;
         private readonly string _password;
         private bool _programRunning = true;
-#if DEBUG
-        private readonly Stopwatch _stopWatch = new Stopwatch();
-#endif
         private ClientStatus _connectionStatus;
         private ShellStream _shell;
-        private CTimer _keepAliveTimer;
         private decimal _timeOutCount;
         private readonly AutoResetEvent _retryWait = new AutoResetEvent(false);
-
         private const int BufferSize = 100000;
         private const long KeepAliveTime = 30000;
 
@@ -46,10 +38,8 @@ namespace UXAV.AVnet.Biamp
                 if (!_programRunning && Connected)
                 {
                     _reconnect = false;
-                    Send("bye");
+                    _shell?.Dispose();
                 }
-                //if (!_programRunning && _threadWait != null)
-                //_threadWait.Set();
             };
         }
 
@@ -101,22 +91,41 @@ namespace UXAV.AVnet.Biamp
 
             _reconnect = true;
 
-            var info = new KeyboardInteractiveConnectionInfo(_address, 22, _username);
-            info.AuthenticationPrompt += OnPasswordPrompt;
+            var keyboardAuthMethod = new KeyboardInteractiveAuthenticationMethod(_username);
+            keyboardAuthMethod.AuthenticationPrompt += (sender, e) =>
+                {
+                    foreach (var prompt in e.Prompts)
+                    {
+                        Logger.Debug("Tesira Prompt: {0}\rReturning password...", prompt.Request);
+                        prompt.Response = _password;
+                    }
+                };
 
-            _client = new SshClient(info);
-            _client.ErrorOccurred += (sender, args) => CrestronConsole.PrintLine("ErrorOccurred: {0}", args.Exception.Message);
-            _client.HostKeyReceived +=
-                (sender, args) => CrestronConsole.PrintLine("HostKeyReceived: {1}, can trust = {0}", args.CanTrust,
-                    args.HostKeyName);
-
-            _sshProcess = new Thread(SshCommsProcess, null, Thread.eThreadStartOptions.CreateSuspended)
+            var authMethods = new AuthenticationMethod[]
             {
-                Name = "Tesira SSH Comms Handler",
-                Priority = Thread.eThreadPriority.HighPriority
+                new PasswordAuthenticationMethod(_username, _password),
+                keyboardAuthMethod
             };
 
-            _sshProcess.Start();
+            var connectionInfo = new ConnectionInfo(_address, "default", authMethods);
+            _client = new SshClient(connectionInfo)
+            {
+                KeepAliveInterval = TimeSpan.FromMilliseconds(KeepAliveTime)
+            };
+            _client.ErrorOccurred += (sender, args) => Logger.Error("Tesira SSh ErrorOccurred: {0}", args.Exception.Message);
+            _client.HostKeyReceived +=
+                (sender, args) =>
+                {
+                    Logger.Debug("HostKeyReceived: {1}, can trust = {0}", args.CanTrust,
+                                        args.HostKeyName);
+                    if (!args.CanTrust)
+                    {
+                        Logger.Debug("Setting CanTrust to true");
+                        args.CanTrust = true;
+                    }
+                };
+
+            Task.Run(SshCommsProcess);
         }
 
         public void Disconnect()
@@ -144,17 +153,6 @@ namespace UXAV.AVnet.Biamp
             }
         }
 
-        private void OnPasswordPrompt(object sender, AuthenticationPromptEventArgs authenticationPromptEventArgs)
-        {
-            foreach (
-                var prompt in
-                    authenticationPromptEventArgs.Prompts.Where(prompt => prompt.Request.Contains("Password:")))
-            {
-                Logger.Debug("Tesira password prompt ... sending password");
-                prompt.Response = _password;
-            }
-        }
-
         protected virtual void OnConnectionStatusChange(TtpSshClient client, ClientStatus status)
         {
             var handler = ConnectionStatusChange;
@@ -171,7 +169,7 @@ namespace UXAV.AVnet.Biamp
             }
         }
 
-        private object SshCommsProcess(object userSpecific)
+        private async Task SshCommsProcess()
         {
             try
             {
@@ -186,7 +184,7 @@ namespace UXAV.AVnet.Biamp
                     try
                     {
                         ConnectionStatus = ClientStatus.AttemptingConnection;
-                        _client.Connect();
+                        await _client.ConnectAsync(CancellationToken.None);
                     }
                     catch (Exception e)
                     {
@@ -194,6 +192,10 @@ namespace UXAV.AVnet.Biamp
                         if (!firstFail)
                         {
                             Logger.Error(e);
+                            if (e.InnerException != null)
+                            {
+                                Logger.Error(e.InnerException);
+                            }
                             firstFail = true;
                         }
 
@@ -203,7 +205,7 @@ namespace UXAV.AVnet.Biamp
                             _reconnect = false;
                             _client.Dispose();
                             _client = null;
-                            return null;
+                            return;
                         }
                     }
                 }
@@ -213,186 +215,24 @@ namespace UXAV.AVnet.Biamp
                     _client.Dispose();
                     _client = null;
                     ConnectionStatus = ClientStatus.Disconnected;
-                    return null;
+                    return;
                 }
 
                 Logger.Success($"Connected to {_address}");
 
                 _shell = _client.CreateShellStream("terminal", 80, 24, 800, 600, BufferSize);
 
-                var buffer = new byte[BufferSize];
-                var dataCount = 0;
+                _ = Task.Run(() => ReadShell(_shell));
 
                 try
                 {
                     while (_programRunning && _client.IsConnected)
                     {
-
-                        while (_shell.CanRead && _shell.DataAvailable)
-                        {
-                            var incomingData = new byte[BufferSize];
-                            var incomingDataCount = _shell.Read(incomingData, 0, incomingData.Length);
-#if DEBUG
-                            _stopWatch.Start();
-                            Logger.Debug($"Tesira rx {incomingDataCount} bytes");
-                            //Debug.WriteNormal(Debug.AnsiBlue +
-                            //                  Tools.GetBytesAsReadableString(incomingData, 0, incomingDataCount, true) +
-                            //                  Debug.AnsiReset);
-#endif
-                            if (!Connected &&
-                                Encoding.ASCII.GetString(incomingData, 0, incomingDataCount)
-                                    .Contains("Welcome to the Tesira Text Protocol Server..."))
-                            {
-                                _requestsSent.Clear();
-                                _requestsAwaiting.Clear();
-                                _sendQueue.Enqueue("SESSION set verbose true");
-                                ConnectionStatus = ClientStatus.Connected;
-                                _keepAliveTimer = new CTimer(specific =>
-                                {
-#if DEBUG
-                                    Logger.Debug("Sending KeepAlive");
-#endif
-                                    _client.SendKeepAlive();
-                                }, null, KeepAliveTime, KeepAliveTime);
-                            }
-                            else if (Connected)
-                            {
-                                for (var i = 0; i < incomingDataCount; i++)
-                                {
-                                    buffer[dataCount] = incomingData[i];
-
-                                    if (buffer[dataCount] == 10)
-                                    {
-                                        //skip
-                                    }
-                                    else if (buffer[dataCount] != 13)
-                                    {
-                                        dataCount++;
-                                    }
-                                    else
-                                    {
-                                        if (dataCount == 0) continue;
-
-                                        var line = Encoding.UTF8.GetString(buffer, 0, dataCount);
-                                        dataCount = 0;
-#if DEBUG
-                                        Logger.Debug($"Tesira Rx Line: {line}");
-#endif
-                                        TesiraMessage message = null;
-
-                                        if (line == "+OK")
-                                        {
-                                            var request = _requestsAwaiting.TryToDequeue();
-                                            if (request != null)
-                                            {
-#if DEBUG
-                                                Logger.Debug($"Request Response Received: {request}");
-                                                Logger.Success(line);
-#endif
-                                                message = new TesiraResponse(request, null);
-                                            }
-                                        }
-                                        else if (line.StartsWith("+OK "))
-                                        {
-                                            var request = _requestsAwaiting.TryToDequeue();
-                                            if (request != null)
-                                            {
-#if DEBUG
-                                                Logger.Debug($"Request Response Received: {request}");
-                                                Logger.Success(line);
-#endif
-                                                message = new TesiraResponse(request, line.Substring(4));
-                                            }
-                                        }
-                                        else if (line.StartsWith("-ERR "))
-                                        {
-                                            var request = _requestsAwaiting.TryToDequeue();
-                                            if (request != null)
-                                            {
-#if DEBUG
-                                                Logger.Debug($"Request Response Received: {request}");
-                                                Logger.Error(line);
-#endif
-                                                message = new TesiraErrorResponse(request, line.Substring(5));
-                                            }
-                                            else
-                                            {
-                                                Logger.Debug("Error received and request queue returned null!");
-                                                Logger.Error(line);
-                                                _requestsSent.Clear();
-                                                _requestsAwaiting.Clear();
-                                            }
-                                        }
-                                        else if (line.StartsWith("! "))
-                                        {
-#if DEBUG
-                                            Logger.Debug("Notification Received");
-                                            Logger.Debug(line);
-#endif
-                                            message = new TesiraNotification(line.Substring(2));
-                                        }
-                                        else if (!_requestsSent.IsEmpty)
-                                        {
-#if DEBUG
-                                            Logger.Debug($"Last sent request: {_requestsSent.Peek()}");
-#endif
-
-                                            if (_requestsSent.Peek() == line)
-                                            {
-                                                _requestsAwaiting.Enqueue(_requestsSent.Dequeue());
-#if DEBUG
-                                                Logger.Debug($"Now awaiting for response for command: {line}");
-#endif
-                                            }
-                                        }
-
-                                        if (message != null && ReceivedData != null && message.Type != TesiraMessageType.ErrorResponse)
-                                        {
-                                            if (ReceivedData == null) continue;
-                                            try
-                                            {
-                                                _timeOutCount = 0;
-
-                                                ReceivedData(this, message);
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                Logger.Error(e);
-                                            }
-                                        }
-                                        else if (message != null && message.Type == TesiraMessageType.ErrorResponse)
-                                        {
-                                            _timeOutCount = 0;
-
-                                            Logger.Error($"Error message from Tesira: \"{message.Message}\"");
-                                        }
-                                    }
-                                }
-                            }
-#if DEBUG
-                            _stopWatch.Stop();
-                            Logger.Debug($"Time to process: {_stopWatch.ElapsedMilliseconds} ms");
-                            _stopWatch.Reset();
-#endif
-                            CrestronEnvironment.AllowOtherAppsToRun();
-                        }
-
                         if (!_programRunning || !_client.IsConnected) break;
-#if DEBUG
-                        //Debug.WriteNormal(Debug.AnsiBlue +
-                        //                  string.Format(
-                        //                      "Shell Can Write = {0}, _sendQueue = {1}, _requestsSent = {2}, _requestsAwaiting = {3}",
-                        //                      _shell.CanWrite, _sendQueue.Count, _requestsSent.Count,
-                        //                      _requestsAwaiting.Count) + Debug.AnsiReset);
-#endif
+
                         if (_shell.CanWrite && !_sendQueue.IsEmpty && _requestsSent.IsEmpty && _requestsAwaiting.IsEmpty)
                         {
-                            var s = _sendQueue.Dequeue();
-
-                            if (_keepAliveTimer != null && !_keepAliveTimer.Disposed)
-                            {
-                                _keepAliveTimer.Reset(KeepAliveTime, KeepAliveTime);
-                            }
+                            _sendQueue.TryDequeue(out var s);
 #if DEBUG
                             Logger.Debug($"Tesira Tx: {s}");
 #endif
@@ -410,8 +250,8 @@ namespace UXAV.AVnet.Biamp
                                 Logger.Warn(
                                     $"Error waiting to send requests, _requestsAwaiting.Count = {_requestsAwaiting.Count}" +
                                     $" and _requestsSent.Count = {_requestsSent.Count}. Clearing queues!");
-                                _requestsAwaiting.Clear();
-                                _requestsSent.Clear();
+                                while (_requestsAwaiting.TryDequeue(out _)) { }
+                                while (_requestsSent.TryDequeue(out _)) { }
                                 _timeOutCount = 0;
                             }
 
@@ -422,13 +262,6 @@ namespace UXAV.AVnet.Biamp
                 catch (Exception e)
                 {
                     Logger.Error(e);
-                }
-
-                if (_keepAliveTimer != null && !_keepAliveTimer.Disposed)
-                {
-                    _keepAliveTimer.Stop();
-                    _keepAliveTimer.Dispose();
-                    _keepAliveTimer = null;
                 }
 
                 if (_client != null && _client.IsConnected)
@@ -448,7 +281,7 @@ namespace UXAV.AVnet.Biamp
 
             if (!_reconnect || !_programRunning)
             {
-                return null;
+                return;
             }
 
             Thread.Sleep(1000);
@@ -458,10 +291,129 @@ namespace UXAV.AVnet.Biamp
 
             Connect();
 
-            return null;
+            return;
         }
-    }
 
-    public delegate void TtpSshClientConnectionStatusChangedHandler(TtpSshClient client, TtpSshClient.ClientStatus status);
-    public delegate void TtpSshClientReceivedDataEventHandler(TtpSshClient client, TesiraMessage message);
+        async Task ReadShell(ShellStream shell)
+        {
+            var reader = new StreamReader(shell);
+
+            while (true)
+            {
+                var line = await reader.ReadLineAsync();
+
+                if (line == null)
+                {
+                    Logger.Warn("Tesira Shell stream closed!");
+                    return;
+                }
+
+                if (!Connected && line.Contains("Welcome to the Tesira Text Protocol Server..."))
+                {
+                    while (_requestsAwaiting.TryDequeue(out _)) { }
+                    while (_requestsSent.TryDequeue(out _)) { }
+                    while (_sendQueue.TryDequeue(out _)) { }
+                    _sendQueue.Enqueue("SESSION set verbose true");
+                    ConnectionStatus = ClientStatus.Connected;
+                }
+
+#if DEBUG
+                Logger.Debug($"Tesira Rx Line: {line}");
+#endif
+                TesiraMessage message = null;
+
+                if (line == "+OK")
+                {
+                    if (_requestsAwaiting.TryDequeue(out var request))
+                    {
+#if DEBUG
+                        Logger.Debug($"Request Response Received: {request}");
+                        Logger.Success(line);
+#endif
+                        message = new TesiraResponse(request, null);
+                    }
+                }
+                else if (line.StartsWith("+OK "))
+                {
+                    if (_requestsAwaiting.TryDequeue(out var request))
+                    {
+#if DEBUG
+                        Logger.Debug($"Request Response Received: {request}");
+                        Logger.Success(line);
+#endif
+                        message = new TesiraResponse(request, line.Substring(4));
+                    }
+                }
+                else if (line.StartsWith("-ERR "))
+                {
+                    if (_requestsAwaiting.TryDequeue(out var request))
+                    {
+#if DEBUG
+                        Logger.Debug($"Request Response Received: {request}");
+                        Logger.Error(line);
+#endif
+                        message = new TesiraErrorResponse(request, line.Substring(5));
+                    }
+                    else
+                    {
+                        Logger.Debug("Error received and request queue returned null!");
+                        Logger.Error(line);
+                        while (_requestsSent.TryDequeue(out _)) { }
+                        while (_requestsAwaiting.TryDequeue(out _)) { }
+                    }
+                }
+                else if (line.StartsWith("! "))
+                {
+#if DEBUG
+                    Logger.Debug("Notification Received");
+                    Logger.Debug(line);
+#endif
+                    message = new TesiraNotification(line.Substring(2));
+                }
+                else if (!_requestsSent.IsEmpty)
+                {
+                    if (_requestsSent.TryPeek(out var lastSent))
+                    {
+#if DEBUG
+                        Logger.Debug($"Last sent request: {lastSent}");
+#endif
+                        if (lastSent == line)
+                        {
+                            if (_requestsSent.TryDequeue(out lastSent))
+                            {
+                                _requestsAwaiting.Enqueue(lastSent);
+#if DEBUG
+                                Logger.Debug($"Now awaiting for response for command: {line}");
+#endif
+                            }
+                        }
+                    }
+                }
+
+                if (message != null && ReceivedData != null && message.Type != TesiraMessageType.ErrorResponse)
+                {
+                    if (ReceivedData == null) continue;
+                    try
+                    {
+                        _timeOutCount = 0;
+
+                        ReceivedData(this, message);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error(e);
+                    }
+                }
+                else if (message != null && message.Type == TesiraMessageType.ErrorResponse)
+                {
+                    _timeOutCount = 0;
+
+                    Logger.Error($"Error message from Tesira: \"{message.Message}\"");
+                }
+            }
+        }
+
+        public delegate void TtpSshClientConnectionStatusChangedHandler(TtpSshClient client, TtpSshClient.ClientStatus status);
+        public delegate void TtpSshClientReceivedDataEventHandler(TtpSshClient client, TesiraMessage message);
+    }
 }

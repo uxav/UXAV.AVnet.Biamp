@@ -20,6 +20,15 @@
           "Microsoft.NETFramework.ReferenceAssemblies.net472": "1.0.3"
         }
       },
+      "SSH.NET": {
+        "type": "Direct",
+        "requested": "[2024.1.0, )",
+        "resolved": "2024.1.0",
+        "contentHash": "pyOea9czgC+OwMoetuWtMuwRebOyskKkqTZtODgyEZ5K6JwV+Hh/GFiyYubl93YnEvmvNZeuyWyUDsb3LvBDYA==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "1.0.0"
+        }
+      },
       "UXAV.AVnet.Core": {
         "type": "Direct",
         "requested": "[2.0.0, )",
@@ -273,6 +282,12 @@
         "dependencies": {
           "Crestron.SimplSharp.SDK.Library": "[2.20.52]"
         }
+      },
+      "SSH.NET": {
+        "type": "Direct",
+        "requested": "[2024.1.0, )",
+        "resolved": "2024.1.0",
+        "contentHash": "pyOea9czgC+OwMoetuWtMuwRebOyskKkqTZtODgyEZ5K6JwV+Hh/GFiyYubl93YnEvmvNZeuyWyUDsb3LvBDYA=="
       },
       "UXAV.AVnet.Core": {
         "type": "Direct",
@@ -1234,6 +1249,12 @@
         "dependencies": {
           "Crestron.SimplSharp.SDK.Library": "[2.20.52]"
         }
+      },
+      "SSH.NET": {
+        "type": "Direct",
+        "requested": "[2024.1.0, )",
+        "resolved": "2024.1.0",
+        "contentHash": "pyOea9czgC+OwMoetuWtMuwRebOyskKkqTZtODgyEZ5K6JwV+Hh/GFiyYubl93YnEvmvNZeuyWyUDsb3LvBDYA=="
       },
       "UXAV.AVnet.Core": {
         "type": "Direct",
