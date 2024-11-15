@@ -10,6 +10,7 @@ using UXAV.AVnet.Biamp.ControlBlocks;
 using UXAV.AVnet.Core.DeviceSupport;
 using UXAV.AVnet.Core.Models.Diagnostics;
 using UXAV.Logging;
+using static UXAV.AVnet.Biamp.TtpSshClient;
 
 namespace UXAV.AVnet.Biamp
 {
