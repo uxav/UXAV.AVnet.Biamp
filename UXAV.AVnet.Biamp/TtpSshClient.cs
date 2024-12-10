@@ -107,7 +107,7 @@ namespace UXAV.AVnet.Biamp
                 keyboardAuthMethod
             };
 
-            var connectionInfo = new ConnectionInfo(_address, "default", authMethods);
+            var connectionInfo = new ConnectionInfo(_address, _username, authMethods);
             _client = new SshClient(connectionInfo)
             {
                 KeepAliveInterval = TimeSpan.FromMilliseconds(KeepAliveTime)
