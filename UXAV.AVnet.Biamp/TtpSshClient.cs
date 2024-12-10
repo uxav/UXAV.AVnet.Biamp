@@ -123,7 +123,7 @@ namespace UXAV.AVnet.Biamp
             _client.HostKeyReceived +=
                 (sender, args) =>
                 {
-                    Logger.Log($"Host key received for {_address}: {args.FingerPrintMD5}");
+                    Logger.Log($"Host key received for {_address}: {args.FingerPrintSHA256}");
                     if (!args.CanTrust)
                     {
                         Logger.Warn("Host key not trusted for {_address}");
