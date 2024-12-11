@@ -15,7 +15,7 @@ namespace UXAV.AVnet.Biamp
         private SshClient _client;
         private bool _tryDefaultLogin;
         private bool _reconnect;
-        private readonly ConcurrentQueue<string> _sendQueue = new ConcurrentQueue<string>();
+        private readonly BlockingCollection<string> _sendQueue = new BlockingCollection<string>();
         private readonly ConcurrentQueue<string> _requestsSent = new ConcurrentQueue<string>();
         private readonly ConcurrentQueue<string> _requestsAwaiting = new ConcurrentQueue<string>();
         private readonly string _address;
@@ -24,7 +24,6 @@ namespace UXAV.AVnet.Biamp
         private bool _programRunning = true;
         private ClientStatus _connectionStatus;
         private ShellStream _shell;
-        private decimal _timeOutCount;
         private readonly AutoResetEvent _retryWait = new AutoResetEvent(false);
         private const int BufferSize = 100000;
         private const long KeepAliveTime = 30000;
@@ -152,7 +151,7 @@ namespace UXAV.AVnet.Biamp
         {
             if (Connected)
             {
-                _sendQueue.Enqueue(line);
+                _sendQueue.Add(line);
             }
             else
             {
@@ -261,33 +260,19 @@ namespace UXAV.AVnet.Biamp
                     {
                         if (!_programRunning || !_client.IsConnected) break;
 
-                        if (_shell.CanWrite && !_sendQueue.IsEmpty && _requestsSent.IsEmpty && _requestsAwaiting.IsEmpty)
+                        if (_requestsAwaiting.Count > 0 || _requestsSent.Count > 0)
                         {
-                            _sendQueue.TryDequeue(out var s);
+                            await Task.Delay(50);
+                            continue;
+                        }
+
+                        var s = _sendQueue.Take();
 #if DEBUG
-                            Logger.Debug($"Tesira Tx: {s}");
+                        Logger.Debug($"Tesira Tx: {s}");
 #endif
-                            _timeOutCount = 0;
-                            _shell.WriteLine(s);
-                            _requestsSent.Enqueue(s);
-                            Thread.Sleep(20);
-                        }
-                        else if (!_requestsSent.IsEmpty || !_requestsAwaiting.IsEmpty)
-                        {
-                            _timeOutCount++;
-
-                            if (_timeOutCount > 100)
-                            {
-                                Logger.Warn(
-                                    $"Error waiting to send requests, _requestsAwaiting.Count = {_requestsAwaiting.Count}" +
-                                    $" and _requestsSent.Count = {_requestsSent.Count}. Clearing queues!");
-                                while (_requestsAwaiting.TryDequeue(out _)) { }
-                                while (_requestsSent.TryDequeue(out _)) { }
-                                _timeOutCount = 0;
-                            }
-
-                            Thread.Sleep(20);
-                        }
+                        _shell.WriteLine(s);
+                        _requestsSent.Enqueue(s);
+                        await Task.Delay(50);
                     }
                 }
                 catch (Exception e)
@@ -341,16 +326,22 @@ namespace UXAV.AVnet.Biamp
 
                 if (!Connected && line.Contains("Welcome to the Tesira Text Protocol Server..."))
                 {
+#if DEBUG
+                    Logger.Debug("Tesira Welcome Message Received");
+#endif
                     while (_requestsAwaiting.TryDequeue(out _)) { }
                     while (_requestsSent.TryDequeue(out _)) { }
-                    while (_sendQueue.TryDequeue(out _)) { }
-                    _sendQueue.Enqueue("SESSION set verbose true");
+                    while (_sendQueue.TryTake(out _)) { }
+                    _sendQueue.Add("SESSION set verbose true");
                     ConnectionStatus = ClientStatus.Connected;
+                    continue;
                 }
 
 #if DEBUG
                 Logger.Debug($"Tesira Rx Line: {line}");
 #endif
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
                 TesiraMessage message = null;
 
                 if (line == "+OK")
@@ -426,8 +417,6 @@ namespace UXAV.AVnet.Biamp
                     if (ReceivedData == null) continue;
                     try
                     {
-                        _timeOutCount = 0;
-
                         ReceivedData(this, message);
                     }
                     catch (Exception e)
@@ -437,8 +426,6 @@ namespace UXAV.AVnet.Biamp
                 }
                 else if (message != null && message.Type == TesiraMessageType.ErrorResponse)
                 {
-                    _timeOutCount = 0;
-
                     Logger.Error($"Error message from Tesira: \"{message.Message}\"");
                 }
             }
