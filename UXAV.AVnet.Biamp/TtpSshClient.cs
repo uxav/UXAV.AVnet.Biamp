@@ -24,6 +24,7 @@ namespace UXAV.AVnet.Biamp
         private bool _programRunning = true;
         private ClientStatus _connectionStatus;
         private ShellStream _shell;
+        private decimal _timeOutCount;
         private readonly AutoResetEvent _retryWait = new AutoResetEvent(false);
         private const int BufferSize = 100000;
         private const long KeepAliveTime = 30000;
@@ -263,6 +264,19 @@ namespace UXAV.AVnet.Biamp
                         if (_requestsAwaiting.Count > 0 || _requestsSent.Count > 0)
                         {
                             await Task.Delay(50);
+
+                            _timeOutCount++;
+
+                            if (_timeOutCount > 100)
+                            {
+                                Logger.Warn(
+                                    $"Error waiting to send requests, _requestsAwaiting.Count = {_requestsAwaiting.Count}" +
+                                    $" and _requestsSent.Count = {_requestsSent.Count}. Clearing queues!");
+                                while (_requestsAwaiting.TryDequeue(out _)) { }
+                                while (_requestsSent.TryDequeue(out _)) { }
+                                _timeOutCount = 0;
+                            }
+
                             continue;
                         }
 
@@ -417,6 +431,8 @@ namespace UXAV.AVnet.Biamp
                     if (ReceivedData == null) continue;
                     try
                     {
+                        _timeOutCount = 0;
+
                         ReceivedData(this, message);
                     }
                     catch (Exception e)
@@ -426,6 +442,8 @@ namespace UXAV.AVnet.Biamp
                 }
                 else if (message != null && message.Type == TesiraMessageType.ErrorResponse)
                 {
+                    _timeOutCount = 0;
+
                     Logger.Error($"Error message from Tesira: \"{message.Message}\"");
                 }
             }
