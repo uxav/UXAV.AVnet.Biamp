@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Crestron.SimplSharp;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 using UXAV.Logging;
 
 namespace UXAV.AVnet.Biamp
@@ -12,6 +13,7 @@ namespace UXAV.AVnet.Biamp
     public class TtpSshClient
     {
         private SshClient _client;
+        private bool _tryDefaultLogin;
         private bool _reconnect;
         private readonly ConcurrentQueue<string> _sendQueue = new ConcurrentQueue<string>();
         private readonly ConcurrentQueue<string> _requestsSent = new ConcurrentQueue<string>();
@@ -81,6 +83,31 @@ namespace UXAV.AVnet.Biamp
             }
         }
 
+        private SshClient CreateClient(string host, string username, string password)
+        {
+            var keyboardAuthMethod = new KeyboardInteractiveAuthenticationMethod(username);
+            keyboardAuthMethod.AuthenticationPrompt += (sender, e) =>
+            {
+                foreach (var prompt in e.Prompts)
+                {
+                    Logger.Debug("Tesira Prompt: {0}\rReturning password...", prompt.Request);
+                    prompt.Response = password;
+                }
+            };
+
+            var authMethods = new AuthenticationMethod[]
+            {
+                new PasswordAuthenticationMethod(username, password),
+                keyboardAuthMethod
+            };
+
+            var connectionInfo = new ConnectionInfo(host, username, authMethods);
+            return new SshClient(connectionInfo)
+            {
+                KeepAliveInterval = TimeSpan.FromMilliseconds(KeepAliveTime)
+            };
+        }
+
         public void Connect()
         {
             if (_client != null && _client.IsConnected)
@@ -91,35 +118,15 @@ namespace UXAV.AVnet.Biamp
 
             _reconnect = true;
 
-            var keyboardAuthMethod = new KeyboardInteractiveAuthenticationMethod(_username);
-            keyboardAuthMethod.AuthenticationPrompt += (sender, e) =>
-                {
-                    foreach (var prompt in e.Prompts)
-                    {
-                        Logger.Debug("Tesira Prompt: {0}\rReturning password...", prompt.Request);
-                        prompt.Response = _password;
-                    }
-                };
-
-            var authMethods = new AuthenticationMethod[]
-            {
-                new PasswordAuthenticationMethod(_username, _password),
-                keyboardAuthMethod
-            };
-
-            var connectionInfo = new ConnectionInfo(_address, _username, authMethods);
-            _client = new SshClient(connectionInfo)
-            {
-                KeepAliveInterval = TimeSpan.FromMilliseconds(KeepAliveTime)
-            };
+            _client = CreateClient(_address, _username, _password);
             _client.ErrorOccurred += (sender, args) => Logger.Error("Tesira SSh ErrorOccurred: {0}", args.Exception.Message);
             _client.HostKeyReceived +=
                 (sender, args) =>
                 {
-                    Logger.Debug("HostKeyReceived: {1}, can trust = {0}", args.CanTrust,
-                                        args.HostKeyName);
+                    Logger.Log($"Host key received for {_address}: {args.FingerPrintSHA256}");
                     if (!args.CanTrust)
                     {
+                        Logger.Warn("Host key not trusted for {_address}");
                         Logger.Debug("Setting CanTrust to true");
                         args.CanTrust = true;
                     }
@@ -185,6 +192,30 @@ namespace UXAV.AVnet.Biamp
                     {
                         ConnectionStatus = ClientStatus.AttemptingConnection;
                         await _client.ConnectAsync(CancellationToken.None);
+                    }
+                    catch (SshAuthenticationException e)
+                    {
+                        Logger.Error($"Authentication failed for Tesira at {_address}, {e.Message}");
+                        ConnectionStatus = ClientStatus.Disconnected;
+                        _client.Dispose();
+                        _client = null;
+                        _tryDefaultLogin = !_tryDefaultLogin;
+                        if (_tryDefaultLogin)
+                        {
+                            Logger.Warn($"Tesira {_address}, Attempting default login on next connect...");
+                            _client = CreateClient(_address, "default", "");
+                            if (_retryWait.WaitOne(TimeSpan.FromSeconds(5)))
+                            {
+                                _client.Dispose();
+                                _client = null;
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Connect();
+                            return;
+                        }
                     }
                     catch (Exception e)
                     {
